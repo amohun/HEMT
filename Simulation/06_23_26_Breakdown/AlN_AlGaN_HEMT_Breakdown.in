@@ -1,0 +1,200 @@
+#AlN/AlGaN HEMT Field Plating for MATTI THURSTON
+
+go internal
+
+# initial field plate length
+set l= 1.0
+set index=0
+
+#loop on 6 field plate lengths
+loop steps=6
+
+set index=$index+1
+
+# source distance
+set Ls=2
+# source-gate distance
+set Lsg=2
+# gate distance
+set Lg=2
+# gate_drain distance
+set Lgd=4
+# drain distance
+set Ld=2
+
+# field plate thickness
+set Tfp=0.030
+# source/drain contact thickness
+set Tsd=0.050
+# gate contact thickness including field plate thickness: Tg = Tpass + Tfp
+set Tg = 0.130
+# passivation thickness
+set Tpass = 0.100
+# excess dielectric thickness above gate
+set Txs = 0.020
+# total dielectric thickness Tde = Txs + Tfp + Tpass
+set Tde = 0.150
+
+# AlN barrier layer
+set Tbarrier = 0.030
+# AlGaN channel layer
+set Tchannel = 0.040
+# AlN buffer layer
+set Tbuffer = 0.500
+# AlGaN composition fraction
+set xc=0.7
+#set eps0=8.9 - 0.4*$xc
+# set trap lifetime
+set lt=1e-7
+# an optical source helps stability of breakdown
+# by supplying carrier pairs to initiate breakdown
+set light=1e-5
+# polarization charge density if set manually
+#set ch1=1e13
+
+# mesh locations based on field plate geometry
+set x1=$Ls
+set x2=$Ls + $Lsg
+set x3=$Ls + $Lsg + $Lg
+set x4=$Ls + $Lsg + $Lg + $l
+set x5=$Ls + $Lsg + $Lg + $Lgd
+set x6=$Ls + $Lsg + $Lg + $Lgd + $Ld
+
+set y1= $Txs
+set y2= $Txs + $Tfp
+set y3= $Tde
+set y4= $Tde + $Tbarrier
+set y5= $Tde + $Tbarrier + $Tchannel
+set y6= $Tde + $Tbarrier + $Tchannel + $Tbuffer
+
+go atlas 
+
+mesh width=1000	
+# mesh geometry
+x.m l=0.0  s=0.1
+x.m l=$x1  s=0.05
+x.m l=$x2  s=0.05
+x.m l=$x3  s=0.025
+x.m l=$x4  s=0.025
+x.m l=$x5  s=0.025
+x.m l=($x5+$x6)/2  s=0.05 
+x.m l=$x6  s=0.1
+#
+y.m l=0.0  s=0.1000
+y.m l=$y1  s=0.05
+y.m l=$y2  s=0.025
+y.m l=$y3  s=0.025
+y.m l=$y4  s=0.025
+y.m l=$y5  s=0.025
+y.m l=($y5+$y6)/2 s=0.05
+y.m l=$y6  s=0.1
+
+# device structure
+# POLAR.SCALE is chosen to match calibrated values
+# of 2DEG charge concentration
+region num=1 mat=Al2O3 y.min=0 y.max=$y3
+region num=2 mat=AlN y.min=$y3 y.max=$y4  donors=1e15 polarization calc.strain polar.scale=0.65
+region num=3 mat=AlGaN y.min=$y4 y.max=$y5 donors=1e15 x.comp=$xc polarization calc.strain polar.scale=0.65
+region num=4 mat=AlN y.min=$y5 y.max=$y6 donors=1e15 polarization calc.strain polar.scale=0.65 substrate
+
+elect name=source x.min=0 x.max=$x1 y.min=$y3 y.max=$y5
+elect name=drain x.min=$x5 x.max=$x6 y.min=$y3 y.max=$y5
+elect name=gate x.min=$x2 x.max=$x3 y.min=$y1 y.max=$y3
+#gate-connected field plate part
+elect name=gate x.min=$x2 x.max=$x4 y.min=$y1 y.max=$y2
+
+# contact doping
+#doping    gaussian characteristic=0.01 conc=1e18  n.type x.left=0.0 \
+        x.right=0.05 y.top=$y1 y.bottom=$y3 ratio.lateral=0.01 direction=y
+#doping    gaussian characteristic=0.01 conc=1e18  n.type x.left=$xd-0.05 \
+        x.right=$xd y.top=$y1 y.bottom=$y3 ratio.lateral=0.01 direction=y
+
+###################################################################
+# KM parameter set
+###################################################################
+#material material=GaN eg300=3.4 align=0.8 permitt=9.5 \
+	mun=900 mup=10 vsatn=2e7 nc300=1.07e18 nv300=1.16e19 \
+	real.index=2.67 imag.index=0.001 \
+	taun0=$lt taup0=$lt
+#material material=AlGaN affinity=3.82 eg300=3.96 align=0.8 permitt=9.5 \
+	mun=600 mup=10 nc300=2.07e18 nv300=1.16e19 \
+	real.index=2.5 imag.index=0.001 \
+	taun0=$lt taup0=$lt
+###################################################################
+model print fermi fldmob srh pch.elec
+#impact material=GaN selb an1=2.9e8 an2=2.9e8 bn1=3.4e7 bn2=3.4e7 \
+	    ap1=2.9e8 ap2=2.9e8 bp1=3.4e7 bp2=3.4e7
+#impact selb e.dir ^e.side directed angle=0
+#
+#contact name=gate work=5.23
+#
+#interface charge=$ch1 s.s ^s.i y.min=$y1 y.max=$y3
+#
+#beam number=1 x.o=0 y.o=$y4+0.1 angle=270 wavelength=0.3
+#
+output con.band val.band band.param charge e.mob h.mob flowlines qss
+############################################################################## 
+# idvg curve
+##############################################################################
+solve init
+save outfile=AlN_AlGaN_HEMT_FP.str
+
+
+#log outf=ganfetex02_0.log
+#solve vdrain=0.05
+#solve vstep=-0.2 vfinal=-2 name=gate 
+#solve vstep=-0.1 vfinal=-4 name=gate
+#log off
+
+#save outfile=ganfetex02_0.str
+
+#extract init infile="ganfetex02_0.log"
+#extract name="Vpinchoff" xintercept(maxslope(curve(v."gate",i."drain")))
+
+############################################################################## 
+# idvd breakdown curves
+##############################################################################
+#method autonr gcarr.itlimit=10 clim.dd=1e3 clim.eb=1e3 nblockit=25
+#solve init 
+# turn on optical source to help initiate breakdown
+#solve b1=$light index.check
+#
+#solve nsteps=10 vfinal=$Vpinchoff name=gate b1=$light
+
+#log outf=ganfetex02_$'index'.log
+
+#solve  vstep=0.1 vfinal=1  name=drain b1=$light
+#solve  vstep=1   vfinal=10 name=drain b1=$light
+#solve  vstep=2   vfinal=20 name=drain b1=$light
+#solve  vstep=5 vfinal=1200 name=drain  b1=$light cname=drain compl=0.5
+
+# change to current contact to resolve breakdown
+#contact name=drain current
+#solve 
+#solve imult istep=1.1 ifinal=1 name=drain
+#
+#save outfile=ganfetex02_$'index'.str 
+#
+
+#extract init infile="ganfetex02_$'index'.log"
+#extract name="a" slope(maxslope(curve(i."drain",v."drain")))
+#extract name="b" xintercept(maxslope(curve(i."drain",v."drain")))
+#extract name="Vdmax" max(curve(i."drain",v."drain"))
+#extract name="Idmax" x.val from curve(i."drain",v."drain") where y.val=$Vdmax
+#extract name="Vd1" $Vdmax - 20
+#extract name="Id1" y.val from curve(v."drain",i."drain") where x.val=$Vd1
+#extract name="c" grad from curve(v."drain",i."drain") where x.val=$Vdmax
+#extract name="d" $Idmax - $c*$Vdmax
+#extract name="Vbr" ($b - $d)/($c - (1/$a))
+#extract name="Is" $b + $Vbr/$a
+
+go internal
+
+set l=$l+0.25
+
+l.end
+
+#tonyplot ganfetex02_1.str ganfetex02_2.str ganfetex02_3.str ganfetex02_4.str ganfetex02_5.str ganfetex02_6.str -set ganfetex02_1.set
+#tonyplot -overlay ganfetex02_1.log ganfetex02_2.log ganfetex02_3.log ganfetex02_4.log ganfetex02_5.log ganfetex02_6.log -set ganfetex02_0.set
+
+quit

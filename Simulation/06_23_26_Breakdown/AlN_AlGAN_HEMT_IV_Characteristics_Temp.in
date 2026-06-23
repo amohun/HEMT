@@ -1,0 +1,126 @@
+go atlas 
+
+# Sweep increment
+set vstart = 0
+set vstop = 15
+set vinc = .5
+
+# source distance
+set Ls=2
+# source-gate distance
+set Lsg=2
+# gate distance
+set Lg=2
+# gate_drain distance
+set Lgd=4
+# drain distance
+set Ld=2
+
+#Passivation thickness
+set Tpass = 0.100
+# AlN barrier layer
+set Tbarrier = 0.030
+# AlGaN channel layer
+set Tchannel = 0.040
+# AlN buffer layer
+set Tbuffer = 0.500
+# AlGaN composition fraction
+set xc=0.7
+
+#set eps0=8.9 - 0.4*$xc
+# set trap lifetime
+set lt=1e-7
+# an optical source helps stability of breakdown
+# by supplying carrier pairs to initiate breakdown
+set light=1e-5
+
+# mesh locations based on field plate geometry
+set x1=$Ls
+set x2=$Ls + $Lsg
+set x3=$Ls + $Lsg + $Lg
+set x4=$Ls + $Lsg + $Lg + $Lgd
+set x5=$Ls + $Lsg + $Lg + $Lgd + $Ld
+
+set y1= $Tpass
+set y2= $Tpass + $Tbarrier
+set y3= $Tpass + $Tbarrier + $Tchannel
+set y4= $Tpass + $Tbarrier + $Tchannel + $Tbuffer 
+
+mesh width=100	
+# mesh geometry
+x.m l=0.0  s=0.1
+x.m l=$x1  s=0.05
+x.m l=$x2  s=0.025
+x.m l=$x3  s=0.025
+x.m l=$x4  s=0.05
+x.m l=$x5  s=0.1
+
+#
+y.m l=0.0  s=0.05
+y.m l=$y1/2  s=0.025
+y.m l=$y1  s=0.005
+y.m l=$y2  s=0.005
+y.m l=$y3  s=0.005
+y.m l=($y3+$y4)/2  s=0.01
+y.m l=$y4  s=0.05
+
+# device structure
+# POLAR.SCALE is chosen to match calibrated values of 2DEG charge concentration
+region num=1 mat=Al2O3 y.min=0 y.max=$y1
+region num=2 mat=AlN y.min=$y1 y.max=$y2  donors=1e15 polarization calc.strain polar.scale=0.8
+region num=3 mat=AlGaN y.min=$y2 y.max=$y3 donors=1e15 x.comp=$xc polarization calc.strain polar.scale=0.8
+region num=4 mat=AlN y.min=$y3 y.max=$y4 donors=1e15 polarization calc.strain polar.scale=0.8 substrate
+#region num=2 mat=AlN y.min=$y1 y.max=$y2 polarization calc.strain polar.scale=0.8
+#region num=3 mat=AlGaN y.min=$y2 y.max=$y3 x.comp=$xc polarization calc.strain polar.scale=0.8
+#region num=4 mat=AlN y.min=$y3 y.max=$y4 polarization calc.strain polar.scale=0.8 substrate
+
+elec num=1 name=source x.min=0 x.max=$x1 y.min=$y1 y.max=$y3
+elec num=2 name=drain x.min=$x4 x.max=$x5 y.min=$y1 y.max=$y3
+elec num=3 name=gate x.min=$x2 x.max=$x3 y.min=0 y.max=$y1 
+
+contact name=gate work=5
+contact name=source work=3
+contact name=drain work=3
+
+models print srh 
+mobility albrct.n 
+model polarization calc.strain polar.scale=0.8
+model lat.temp 
+
+# the following statements are for thermal modeling
+thermcontact num=1 y.min=$y4 y.max=$y4 ext.temp=300 
+
+output con.band val.band charge  polar.charge band.par flowlines
+
+method block newton 
+
+solve init
+save outf=Basic_AlN_AlGaN_HEMT_for_Temp.str
+
+solve vgate=-3
+log outf=Basic_AlN_AlGaN_HEMT_1_lat.log
+solve name=drain vdrain=$vstart vfinal=$vstop vstep=$vinc
+log off
+#
+solve init
+solve vgate=-2
+log outf=Basic_AlN_AlGaN_HEMT_2_lat.log
+solve name=drain vdrain=$vstart vfinal=$vstop vstep=$vinc
+log off
+#
+solve init
+solve vgate=-1
+log outf=Basic_AlN_AlGaN_HEMT_3_lat.log
+solve name=drain vdrain=$vstart vfinal=$vstop vstep=$vinc
+log off
+#
+solve init
+solve vgate=0
+log outf=Basic_AlN_AlGaN_HEMT_4_lat.log
+solve name=drain vdrain=$vstart vfinal=$vstop vstep=$vinc
+log off
+
+tonyplot -overlay Basic_AlN_AlGaN_HEMT_1_lat.log Basic_AlN_AlGaN_HEMT_2_lat.log Basic_AlN_AlGaN_HEMT_3_lat.log Basic_AlN_AlGaN_HEMT_4_lat.log -set Basic_AlN_AlGaN_HEMT_2.set
+tonyplot Basic_AlN_AlGaN_HEMT_for_Temp.str -set Basic_AlN_AlGaN_HEMT_3_lat.set
+
+quit
